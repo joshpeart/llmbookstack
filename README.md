@@ -14,7 +14,8 @@ This project is a Flask-based web application that uses AI (ChatGPT or Ollama) t
 ## 📸 Screenshot
 
 [screenshot]![image](https://github.com/user-attachments/assets/c3b4df90-7e34-4e49-b465-351dbae3fb8a)
-![image](https://github.com/user-attachments/assets/ac221a66-e8b4-4df5-a0de-64cdacbef671)
+[screenshot]![image](https://github.com/user-attachments/assets/ac221a66-e8b4-4df5-a0de-64cdacbef671)
+Bookstack Output
 
 ## 🚀 Requirements
 
