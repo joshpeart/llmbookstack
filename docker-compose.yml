@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - BOOKSTACK_URL=${BOOKSTACK_URL}
+      - BOOKSTACK_TOKEN_ID=${BOOKSTACK_TOKEN_ID}
+      - BOOKSTACK_TOKEN_SECRET=${BOOKSTACK_TOKEN_SECRET}
