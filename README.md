@@ -84,6 +84,6 @@ Pull requests are welcome! If you have improvements, ideas, or find a bug — fe
 ## 📄 License
 MIT
 
-Built with ❤️ by Josh Peart and ChatGPT
+Built with ❤️ by Josh Peart and ChatGPT.  
 Inspired by the dream of effortless, structured documentation.
 
