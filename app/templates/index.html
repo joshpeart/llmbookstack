@@ -1,0 +1,348 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Knowledgebase Generator</title>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f4f6f8; }
+    h1 { font-size: 1.8em; margin-bottom: 10px; }
+
+    .controls {
+      background: #fff;
+      padding: 15px;
+      border-radius: 5px;
+      box-shadow: 0 0 3px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+
+    input, select, button {
+      font-size: 1em;
+      margin-bottom: 10px;
+      padding: 8px;
+    }
+
+    .chapter {
+      border: 1px solid #ccc;
+      margin-bottom: 10px;
+      background: #fff;
+      border-radius: 4px;
+      padding: 10px;
+    }
+
+    .chapter-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: move;
+    }
+
+    .chapter-header h2 {
+      margin: 0;
+      font-size: 1.2em;
+    }
+
+    .chapter-header i {
+      cursor: pointer;
+      margin-left: 10px;
+    }
+
+    .pages {
+      margin-top: 10px;
+    }
+
+    .page {
+      border: 1px dashed #aaa;
+      padding: 10px;
+      margin: 5px 0;
+      background: #fefefe;
+      border-radius: 4px;
+      cursor: move;
+    }
+
+    .preview {
+      border: 1px solid #ddd;
+      margin-top: 5px;
+      background: #fafafa;
+      padding: 8px;
+      font-family: monospace;
+    }
+
+    textarea {
+      width: 100%;
+      height: 180px;
+    }
+
+    .status-log {
+      margin-top: 20px;
+      padding: 10px;
+      background: #fff;
+      border: 1px solid #ccc;
+      height: 150px;
+      overflow-y: scroll;
+      border-radius: 5px;
+      white-space: pre-wrap;
+    }
+
+    .loader {
+      display: none;
+      font-weight: bold;
+    }
+
+    .drag-handle {
+      margin-right: 8px;
+      cursor: move;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <h1>📘 AI Knowledgebase Builder</h1>
+
+  <div class="controls">
+    <label for="topic">📌 Topic:</label><br />
+    <input type="text" id="topic" style="width: 400px;" /><br />
+    <label for="provider">🧠 Model Provider:</label>
+    <select id="provider">
+      <option value="chatgpt">ChatGPT</option>
+      <option value="ollama">Ollama</option>
+    </select><br />
+    <button onclick="generate()">🚀 Generate</button>
+    <button onclick="clearOutput()">🧹 Clear</button>
+    <button id="pushBtn" onclick="pushToBookstack()" disabled>📤 Push to BookStack</button>
+    <div class="loader" id="loader">⏳ Generating...</div>
+  </div>
+
+  <div class="status-log" id="statusLog">Status updates will appear here...</div>
+  <div id="output"></div>
+
+  <script>
+    let generatedData = null;
+
+    function logStatus(message) {
+      const log = document.getElementById("statusLog");
+      log.innerText += `\n${message}`;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function clearOutput() {
+      document.getElementById("output").innerHTML = "";
+      document.getElementById("statusLog").innerText = "";
+      generatedData = null;
+      document.getElementById("pushBtn").disabled = true;
+    }
+
+    async function generate() {
+      const topic = document.getElementById("topic").value;
+      const provider = document.getElementById("provider").value;
+      const loader = document.getElementById("loader");
+
+      if (!topic) return alert("Please enter a topic.");
+
+      loader.style.display = "block";
+      clearOutput();
+      logStatus("⏳ Starting generation...");
+
+      const response = await fetch("/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, provider }),
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let done = false;
+      let jsonBuffer = "";
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        if (value) {
+          const text = decoder.decode(value, { stream: true });
+          const lines = text.split("\n\n").filter(Boolean);
+          for (const line of lines) {
+            const message = line.replace("data: ", "").trim();
+            if (message === "__COMPLETE__") {
+              done = true;
+              break;
+            } else if (message.startsWith("__ERROR__")) {
+              loader.style.display = "none";
+              alert("Error: " + message.replace("__ERROR__", ""));
+              return;
+            } else if (message.startsWith("__JSON_B64__")) {
+              const b64data = message.replace("__JSON_B64__ ", "").trim();
+              const binaryString = atob(b64data);
+              const binaryData = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                binaryData[i] = binaryString.charCodeAt(i);
+              }
+
+              try {
+                const decompressed = pako.inflate(binaryData, { to: 'string' });
+                generatedData = JSON.parse(decompressed);
+              } catch (e) {
+                logStatus("❌ Failed to decompress JSON: " + e.message);
+              }
+            } else {
+              logStatus(message);
+            }
+          }
+        }
+        done = readerDone;
+      }
+
+      if (generatedData) {
+        renderKnowledgeBase(generatedData);
+        document.getElementById("pushBtn").disabled = false;
+        logStatus("✅ Generation complete.");
+      } else {
+        logStatus("⚠️ No data was generated.");
+      }
+
+      loader.style.display = "none";
+    }
+
+    function toggleChapterPages(chapterDiv) {
+      const pagesDiv = chapterDiv.querySelector(".pages");
+      const icon = chapterDiv.querySelector(".toggle-icon");
+      if (pagesDiv.style.display === "none") {
+        pagesDiv.style.display = "block";
+        icon.classList.remove("fa-chevron-down");
+        icon.classList.add("fa-chevron-up");
+      } else {
+        pagesDiv.style.display = "none";
+        icon.classList.remove("fa-chevron-up");
+        icon.classList.add("fa-chevron-down");
+      }
+    }
+
+    function renderKnowledgeBase(data) {
+      const output = document.getElementById("output");
+      output.innerHTML = "";
+
+      const chaptersContainer = document.createElement("div");
+      chaptersContainer.id = "chapters";
+
+      Object.entries(data).forEach(([chapterTitle, pages]) => {
+        const chapterDiv = document.createElement("div");
+        chapterDiv.className = "chapter";
+
+        const header = document.createElement("div");
+        header.className = "chapter-header";
+
+        const dragIcon = document.createElement("span");
+        dragIcon.className = "drag-handle";
+        dragIcon.innerHTML = '<i class="fas fa-grip-lines"></i>';
+
+        const title = document.createElement("h2");
+        title.contentEditable = true;
+        title.innerText = chapterTitle;
+
+        const toggleIcon = document.createElement("i");
+        toggleIcon.className = "fas fa-chevron-up toggle-icon";
+        toggleIcon.onclick = () => toggleChapterPages(chapterDiv);
+
+        header.appendChild(dragIcon);
+        header.appendChild(title);
+        header.appendChild(toggleIcon);
+        chapterDiv.appendChild(header);
+
+        const pageList = document.createElement("div");
+        pageList.className = "pages";
+
+        Object.entries(pages).forEach(([pageTitle, content]) => {
+          const pageDiv = document.createElement("div");
+          pageDiv.className = "page";
+
+          const dragHandle = document.createElement("span");
+          dragHandle.className = "drag-handle";
+          dragHandle.innerHTML = '<i class="fas fa-bars"></i>';
+
+          const pageHeader = document.createElement("h3");
+          pageHeader.contentEditable = true;
+          pageHeader.innerText = pageTitle;
+
+          const textarea = document.createElement("textarea");
+          textarea.value = content;
+
+          const preview = document.createElement("div");
+          preview.className = "preview";
+
+          try {
+            preview.innerHTML = marked.parse(content);
+          } catch (err) {
+            preview.innerHTML = `<pre>Error parsing markdown: ${err.message}</pre>`;
+          }
+
+          textarea.addEventListener("input", () => {
+            try {
+              preview.innerHTML = marked.parse(textarea.value);
+            } catch (err) {
+              preview.innerHTML = `<pre>Error parsing markdown: ${err.message}</pre>`;
+            }
+          });
+
+          pageDiv.appendChild(dragHandle);
+          pageDiv.appendChild(pageHeader);
+          pageDiv.appendChild(textarea);
+          pageDiv.appendChild(preview);
+          pageList.appendChild(pageDiv);
+        });
+
+        chapterDiv.appendChild(pageList);
+        chaptersContainer.appendChild(chapterDiv);
+      });
+
+      output.appendChild(chaptersContainer);
+
+      Sortable.create(chaptersContainer, {
+        animation: 200,
+        handle: ".chapter-header",
+        draggable: ".chapter"
+      });
+
+      document.querySelectorAll(".pages").forEach(el => {
+        Sortable.create(el, {
+          animation: 200,
+          handle: ".drag-handle"
+        });
+      });
+    }
+
+    async function pushToBookstack() {
+      const chapters = document.querySelectorAll(".chapter");
+      const dataToPush = {};
+
+      chapters.forEach(chapterDiv => {
+        const chapterTitle = chapterDiv.querySelector("h2").innerText;
+        const pages = chapterDiv.querySelectorAll(".page");
+        const pageData = {};
+        pages.forEach(pageDiv => {
+          const title = pageDiv.querySelector("h3").innerText;
+          const content = pageDiv.querySelector("textarea").value;
+          pageData[title] = content;
+        });
+        dataToPush[chapterTitle] = pageData;
+      });
+
+      logStatus("🚀 Pushing to BookStack...");
+      const res = await fetch("/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kb_data: dataToPush }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        alert("✅ Successfully pushed to BookStack!");
+        logStatus("✅ Push complete.");
+      } else {
+        alert("❌ Failed to push to BookStack.");
+        logStatus("❌ Push failed.");
+      }
+    }
+  </script>
+</body>
+</html>
