@@ -41,19 +41,19 @@ BOOKSTACK_TOKEN_ID=your-token-id
 BOOKSTACK_TOKEN_SECRET=your-token-secret
 ```
 
-📚 Installing BookStack
+## 📚 Installing BookStack
 Full install instructions can be found here:
 👉 https://www.bookstackapp.com/docs/admin/installation/
 
 We recommend using the Docker installation method if you're not familiar with Laravel/PHP-based setups.
 
-🛠️ Running the App
+## 🛠️ Running the App
 ```bash
 docker compose up --build
 ```
 Then visit http://localhost:5000 in your browser.
 
-💡 Example Use Cases
+## 💡 Example Use Cases
 Technical documentation for software products
 
 Internal knowledgebase generation for teams
@@ -62,24 +62,24 @@ Automatically drafting wiki content
 
 Educational or training material
 
-🧠 AI Model Behavior
+## 🧠 AI Model Behavior
 Uses llama3.2 by default when using Ollama.
 
 Automatically switches to Code LLaMA for topics that include "code" or "example".
 
 With ChatGPT, uses GPT-4 and custom system prompts to generate clean, helpful Markdown.
 
-🧪 Development Tips
+## 🧪 Development Tips
 Streamed responses use Server-Sent Events (SSE) for live updates in the UI.
 
 Markdown rendering is done with marked.js.
 
 Compression and base64 encoding are used to safely transmit large generated content blocks.
 
-🤝 Contributing
+## 🤝 Contributing
 Pull requests are welcome! If you have improvements, ideas, or find a bug — feel free to open an issue or submit a PR.
 
-📄 License
+## 📄 License
 MIT
 
 Built with ❤️ by Josh Peart and ChatGPT
